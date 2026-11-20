@@ -4,6 +4,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.media.midi.MidiDeviceInfo;
 import android.media.midi.MidiManager;
@@ -11,9 +12,11 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.ArrayAdapter;
+import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.LinearLayout;
+import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -23,17 +26,50 @@ public class MainActivity extends AppCompatActivity {
     Button showMeButton;
     Spinner mode_spinner;
     Spinner device_spinner;
+    Spinner adaptiveStrategySpinner;
     CheckBox landscapeCheckBox;
+    SharedPreferences settings;
+    SeekBar deadzoneSeekBar;
+    SeekBar historySeekBar;
+    SeekBar maxShiftSeekBar;
+    SeekBar alternationIntervalSeekBar;
+    SeekBar targetWidthSeekBar;
+    TextView deadzoneLabel;
+    TextView historyLabel;
+    TextView maxShiftLabel;
+    TextView alternationIntervalLabel;
+    TextView targetWidthLabel;
+    LinearLayout settingsPanel;
+    LinearLayout adaptiveSettingsGroup;
+    LinearLayout alternationSettingsGroup;
+    LinearLayout targetWidthSettingsGroup;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        settings = getSharedPreferences("keypad_settings", MODE_PRIVATE);
         startButton = findViewById(R.id.start_button);
         showMeButton = findViewById(R.id.show_me_button);
         mode_spinner = findViewById(R.id.mode_spinner);
         device_spinner = findViewById(R.id.device_spinner);
         landscapeCheckBox = findViewById(R.id.landscape_checkbox);
+        adaptiveStrategySpinner = findViewById(R.id.adaptive_strategy_spinner);
+        deadzoneSeekBar = findViewById(R.id.deadzone_seekbar);
+        historySeekBar = findViewById(R.id.history_seekbar);
+        maxShiftSeekBar = findViewById(R.id.max_shift_seekbar);
+        alternationIntervalSeekBar = findViewById(R.id.alternation_interval_seekbar);
+        targetWidthSeekBar = findViewById(R.id.target_width_seekbar);
+        deadzoneLabel = findViewById(R.id.deadzone_label);
+        historyLabel = findViewById(R.id.history_label);
+        maxShiftLabel = findViewById(R.id.max_shift_label);
+        alternationIntervalLabel = findViewById(R.id.alternation_interval_label);
+        targetWidthLabel = findViewById(R.id.target_width_label);
+        settingsPanel = findViewById(R.id.settings_panel);
+        adaptiveSettingsGroup = findViewById(R.id.adaptive_settings_group);
+        alternationSettingsGroup = findViewById(R.id.alternation_settings_group);
+        targetWidthSettingsGroup = findViewById(R.id.target_width_settings_group);
 
         startButton.setOnClickListener(startOnClickListener);
         showMeButton.setOnClickListener(showMeOnClickListener);
@@ -42,7 +78,91 @@ public class MainActivity extends AppCompatActivity {
                 R.array.modes, android.R.layout.simple_spinner_item);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         mode_spinner.setAdapter(adapter);
-        mode_spinner.setSelection(0);
+        mode_spinner.setSelection(settings.getInt("mode", 0));
+
+        ArrayAdapter<CharSequence> strategyAdapter = ArrayAdapter.createFromResource(this,
+                R.array.adaptive_strategies, android.R.layout.simple_spinner_item);
+        strategyAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        adaptiveStrategySpinner.setAdapter(strategyAdapter);
+        adaptiveStrategySpinner.setSelection(settings.getInt("adaptiveStrategy", 0));
+
+        configureSeekBar(deadzoneSeekBar, "deadzonePercent",
+                value -> deadzoneLabel.setText(getString(R.string.deadzone_width_label, value)));
+        configureSeekBar(historySeekBar, "historySize",
+                value -> historyLabel.setText(getString(R.string.history_samples_label, value + 4)));
+        configureSeekBar(maxShiftSeekBar, "maxShiftPercent",
+                value -> updateMaxShiftLabel(value + 5));
+        configureSeekBar(alternationIntervalSeekBar, "alternationInterval",
+                value -> alternationIntervalLabel.setText(
+                        getString(R.string.alternation_interval_label, value + 100)));
+        configureSeekBar(targetWidthSeekBar, "targetWidth",
+                value -> targetWidthLabel.setText(getString(R.string.target_width_label, value + 10)));
+
+        mode_spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                settings.edit().putInt("mode", position).apply();
+                updateSettingsPanel(position);
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                updateSettingsPanel(0);
+            }
+        });
+        adaptiveStrategySpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                settings.edit().putInt("adaptiveStrategy", position).apply();
+                updateSettingsPanel(mode_spinner.getSelectedItemPosition());
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                updateSettingsPanel(mode_spinner.getSelectedItemPosition());
+            }
+        });
+        updateSettingsPanel(mode_spinner.getSelectedItemPosition());
+    }
+
+    private void configureSeekBar(SeekBar seekBar, String preference, ProgressCallback callback) {
+        seekBar.setProgress(settings.getInt(preference, seekBar.getProgress()));
+        callback.onProgressChanged(seekBar.getProgress());
+        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                settings.edit().putInt(preference, progress).apply();
+                callback.onProgressChanged(progress);
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar bar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar bar) {
+            }
+        });
+    }
+
+    private void updateSettingsPanel(int mode) {
+        settingsPanel.setVisibility(mode >= 3 ? View.VISIBLE : View.GONE);
+        adaptiveSettingsGroup.setVisibility(mode >= 4 ? View.VISIBLE : View.GONE);
+        alternationSettingsGroup.setVisibility(mode >= 4
+                && adaptiveStrategySpinner.getSelectedItemPosition() == AdaptiveSplitMapping.RAPID_ALTERNATION
+                ? View.VISIBLE : View.GONE);
+        targetWidthSettingsGroup.setVisibility(mode == 5 ? View.VISIBLE : View.GONE);
+        updateMaxShiftLabel(maxShiftSeekBar.getProgress() + 5);
+    }
+
+    private void updateMaxShiftLabel(int value) {
+        int label = mode_spinner.getSelectedItemPosition() == 5
+                ? R.string.max_target_shift_label : R.string.max_split_shift_label;
+        maxShiftLabel.setText(getString(label, value));
+    }
+
+    private interface ProgressCallback {
+        void onProgressChanged(int progress);
     }
 
     @Override
@@ -103,9 +223,16 @@ public class MainActivity extends AppCompatActivity {
         }
 
         Intent intent = new Intent(getApplicationContext(), KeypadActivity.class);
-        intent.putExtra("mode", mode_spinner.getSelectedItemPosition());
+        int selectedMode = mode_spinner.getSelectedItemPosition();
+        intent.putExtra("mode", selectedMode);
         intent.putExtra("orientation", landscapeCheckBox.isChecked());
         intent.putExtra("device", selected.getInner());
+        intent.putExtra("deadzonePercent", deadzoneSeekBar.getProgress());
+        intent.putExtra("adaptiveStrategy", adaptiveStrategySpinner.getSelectedItemPosition());
+        intent.putExtra("historySize", historySeekBar.getProgress() + 4);
+        intent.putExtra("maxShiftPercent", maxShiftSeekBar.getProgress() + 5);
+        intent.putExtra("alternationIntervalMs", alternationIntervalSeekBar.getProgress() + 100);
+        intent.putExtra("targetWidthPercent", targetWidthSeekBar.getProgress() + 10);
         startActivity(intent);
     };
 

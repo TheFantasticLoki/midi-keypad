@@ -18,6 +18,13 @@
         android:scaleType="fitXY"
         app:srcCompat="@drawable/mode0" />
 
+    <gay.nihil.lena.midikeypad.KeypadOverlayView
+        android:id="@+id/keypad_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clickable="true"
+        android:importantForAccessibility="no" />
+
     <!-- This FrameLayout insets its children based on system windows using
          android:fitsSystemWindows. -->
 

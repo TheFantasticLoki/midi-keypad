@@ -18,6 +18,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
@@ -50,9 +51,15 @@ public class KeypadActivity extends AppCompatActivity {
         }
 
         KeypadData data = handler.HandleMotionEvent(event);
+        int action = event.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
+            v.invalidate();
+        }
 
         if (data != null && data.handled) {
-            sendNote(data.on, data.code);
+            if (data.sendMidi) {
+                sendNote(data.on, data.code);
+            }
             return true;
         }
 
@@ -100,7 +107,6 @@ public class KeypadActivity extends AppCompatActivity {
         }
         ActionBar actionBar = Objects.requireNonNull(getSupportActionBar());
         actionBar.hide();
-        binding.fullscreenContent.setOnTouchListener(touchListener);
 
         mode = getIntent().getIntExtra("mode", 0);
 
@@ -122,8 +128,34 @@ public class KeypadActivity extends AppCompatActivity {
                 drawable = AppCompatResources.getDrawable(this, R.drawable.mode2);
                 handler = new ManiaStaticKeypadHandler(binding.fullscreenContent);
                 break;
+            case 3:
+                drawable = AppCompatResources.getDrawable(this, R.drawable.mode0);
+                handler = new OsuDeadzoneKeypadHandler(binding.fullscreenContent,
+                        getIntent().getIntExtra("deadzonePercent", 8));
+                break;
+            case 4:
+                drawable = AppCompatResources.getDrawable(this, R.drawable.mode0);
+                handler = new OsuAdaptiveSplitKeypadHandler(binding.fullscreenContent,
+                        getIntent().getIntExtra("deadzonePercent", 8),
+                        getIntent().getIntExtra("historySize", 12),
+                        getIntent().getIntExtra("maxShiftPercent", 8),
+                        getIntent().getIntExtra("adaptiveStrategy", AdaptiveSplitMapping.POSITION_HISTORY),
+                        getIntent().getIntExtra("alternationIntervalMs", 200));
+                break;
+            case 5:
+                drawable = AppCompatResources.getDrawable(this, R.drawable.mode0);
+                handler = new OsuAdaptiveTargetsKeypadHandler(binding.fullscreenContent,
+                        getIntent().getIntExtra("deadzonePercent", 8),
+                        getIntent().getIntExtra("targetWidthPercent", 40),
+                        getIntent().getIntExtra("historySize", 12),
+                        getIntent().getIntExtra("maxShiftPercent", 8),
+                        getIntent().getIntExtra("adaptiveStrategy", AdaptiveSplitMapping.POSITION_HISTORY),
+                        getIntent().getIntExtra("alternationIntervalMs", 200));
+                break;
         }
         binding.fullscreenContent.setImageDrawable(drawable);
+        binding.keypadOverlay.setHandler(handler);
+        binding.keypadOverlay.setOnTouchListener(touchListener);
 
         MidiManager m = (MidiManager) this.getSystemService(Context.MIDI_SERVICE);
 
