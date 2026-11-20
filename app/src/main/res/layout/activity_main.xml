@@ -119,23 +119,30 @@
                     android:orientation="vertical"
                     android:visibility="gone">
 
-                    <TextView
-                        android:id="@+id/adaptive_strategy_label"
+                    <LinearLayout
+                        android:id="@+id/adaptive_strategy_settings_group"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/adaptive_strategy_label" />
+                        android:orientation="vertical">
 
-                    <Spinner
-                        android:id="@+id/adaptive_strategy_spinner"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content" />
+                        <TextView
+                            android:id="@+id/adaptive_strategy_label"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="@string/adaptive_strategy_label" />
 
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/adaptive_strategy_hint"
-                        android:textSize="12sp" />
+                        <Spinner
+                            android:id="@+id/adaptive_strategy_spinner"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/adaptive_strategy_hint"
+                            android:textSize="12sp" />
+                    </LinearLayout>
 
                     <LinearLayout
                         android:id="@+id/history_settings_group"
@@ -224,6 +231,71 @@
                             android:text="@string/target_width_hint"
                             android:textSize="12sp" />
                     </LinearLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/custom_keypad_settings_group"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/custom_mode_hint"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/custom_key_count_label"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp" />
+
+                    <SeekBar
+                        android:id="@+id/custom_key_count_seekbar"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:max="8"
+                        android:progress="2" />
+
+                    <TextView
+                        android:id="@+id/custom_layout_label"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/custom_layout_label" />
+
+                    <Spinner
+                        android:id="@+id/custom_layout_spinner"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
+                    <TextView
+                        android:id="@+id/custom_channel_label"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/custom_channel_label" />
+
+                    <NumberPicker
+                        android:id="@+id/custom_channel_picker"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center_horizontal" />
+
+                    <TextView
+                        android:id="@+id/custom_notes_label"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/custom_notes_label" />
+
+                    <LinearLayout
+                        android:id="@+id/custom_note_mapping_container"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical" />
                 </LinearLayout>
             </LinearLayout>
 

@@ -16,6 +16,7 @@ import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.LinearLayout;
+import android.widget.NumberPicker;
 import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -27,6 +28,7 @@ public class MainActivity extends AppCompatActivity {
     Spinner mode_spinner;
     Spinner device_spinner;
     Spinner adaptiveStrategySpinner;
+    Spinner customLayoutSpinner;
     CheckBox landscapeCheckBox;
     SharedPreferences settings;
     SeekBar deadzoneSeekBar;
@@ -34,15 +36,23 @@ public class MainActivity extends AppCompatActivity {
     SeekBar maxShiftSeekBar;
     SeekBar alternationIntervalSeekBar;
     SeekBar targetWidthSeekBar;
+    SeekBar customKeyCountSeekBar;
+    NumberPicker customChannelPicker;
     TextView deadzoneLabel;
     TextView historyLabel;
     TextView maxShiftLabel;
     TextView alternationIntervalLabel;
     TextView targetWidthLabel;
+    TextView settingsTitle;
+    TextView customKeyCountLabel;
     LinearLayout settingsPanel;
+    LinearLayout deadzoneSettingsGroup;
     LinearLayout adaptiveSettingsGroup;
+    LinearLayout adaptiveStrategySettingsGroup;
     LinearLayout alternationSettingsGroup;
     LinearLayout targetWidthSettingsGroup;
+    LinearLayout customSettingsGroup;
+    LinearLayout customNoteMappingContainer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,20 +66,29 @@ public class MainActivity extends AppCompatActivity {
         device_spinner = findViewById(R.id.device_spinner);
         landscapeCheckBox = findViewById(R.id.landscape_checkbox);
         adaptiveStrategySpinner = findViewById(R.id.adaptive_strategy_spinner);
+        customLayoutSpinner = findViewById(R.id.custom_layout_spinner);
         deadzoneSeekBar = findViewById(R.id.deadzone_seekbar);
         historySeekBar = findViewById(R.id.history_seekbar);
         maxShiftSeekBar = findViewById(R.id.max_shift_seekbar);
         alternationIntervalSeekBar = findViewById(R.id.alternation_interval_seekbar);
         targetWidthSeekBar = findViewById(R.id.target_width_seekbar);
+        customKeyCountSeekBar = findViewById(R.id.custom_key_count_seekbar);
+        customChannelPicker = findViewById(R.id.custom_channel_picker);
         deadzoneLabel = findViewById(R.id.deadzone_label);
         historyLabel = findViewById(R.id.history_label);
         maxShiftLabel = findViewById(R.id.max_shift_label);
         alternationIntervalLabel = findViewById(R.id.alternation_interval_label);
         targetWidthLabel = findViewById(R.id.target_width_label);
+        settingsTitle = findViewById(R.id.settings_title);
+        customKeyCountLabel = findViewById(R.id.custom_key_count_label);
         settingsPanel = findViewById(R.id.settings_panel);
+        deadzoneSettingsGroup = findViewById(R.id.deadzone_settings_group);
         adaptiveSettingsGroup = findViewById(R.id.adaptive_settings_group);
+        adaptiveStrategySettingsGroup = findViewById(R.id.adaptive_strategy_settings_group);
         alternationSettingsGroup = findViewById(R.id.alternation_settings_group);
         targetWidthSettingsGroup = findViewById(R.id.target_width_settings_group);
+        customSettingsGroup = findViewById(R.id.custom_keypad_settings_group);
+        customNoteMappingContainer = findViewById(R.id.custom_note_mapping_container);
 
         startButton.setOnClickListener(startOnClickListener);
         showMeButton.setOnClickListener(showMeOnClickListener);
@@ -86,8 +105,20 @@ public class MainActivity extends AppCompatActivity {
         adaptiveStrategySpinner.setAdapter(strategyAdapter);
         adaptiveStrategySpinner.setSelection(settings.getInt("adaptiveStrategy", 0));
 
-        configureSeekBar(deadzoneSeekBar, "deadzonePercent",
-                value -> deadzoneLabel.setText(getString(R.string.deadzone_width_label, value)));
+        ArrayAdapter<CharSequence> customLayoutAdapter = ArrayAdapter.createFromResource(this,
+                R.array.custom_layouts, android.R.layout.simple_spinner_item);
+        customLayoutAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        customLayoutSpinner.setAdapter(customLayoutAdapter);
+        customLayoutSpinner.setSelection(settings.getInt("customLayout", MultiKeyMapping.STATIC_LANES));
+
+        customChannelPicker.setMinValue(1);
+        customChannelPicker.setMaxValue(16);
+        customChannelPicker.setWrapSelectorWheel(false);
+        customChannelPicker.setValue(settings.getInt("customMidiChannel", 3));
+        customChannelPicker.setOnValueChangedListener((picker, oldValue, newValue) ->
+                settings.edit().putInt("customMidiChannel", newValue).apply());
+
+        configureDeadzoneSeekBar();
         configureSeekBar(historySeekBar, "historySize",
                 value -> historyLabel.setText(getString(R.string.history_samples_label, value + 4)));
         configureSeekBar(maxShiftSeekBar, "maxShiftPercent",
@@ -97,6 +128,11 @@ public class MainActivity extends AppCompatActivity {
                         getString(R.string.alternation_interval_label, value + 100)));
         configureSeekBar(targetWidthSeekBar, "targetWidth",
                 value -> targetWidthLabel.setText(getString(R.string.target_width_label, value + 10)));
+        configureSeekBar(customKeyCountSeekBar, "customKeyCountProgress", value -> {
+            int keyCount = value + MultiKeyMapping.MIN_KEYS;
+            customKeyCountLabel.setText(getString(R.string.custom_key_count_label, keyCount));
+            rebuildMidiNotePickers(keyCount);
+        });
 
         mode_spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
@@ -114,6 +150,18 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 settings.edit().putInt("adaptiveStrategy", position).apply();
+                updateSettingsPanel(mode_spinner.getSelectedItemPosition());
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                updateSettingsPanel(mode_spinner.getSelectedItemPosition());
+            }
+        });
+        customLayoutSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                settings.edit().putInt("customLayout", position).apply();
                 updateSettingsPanel(mode_spinner.getSelectedItemPosition());
             }
 
@@ -145,20 +193,93 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void configureDeadzoneSeekBar() {
+        deadzoneSeekBar.setProgress(settings.getInt(deadzonePreferenceForCurrentMode(), 8));
+        updateDeadzoneLabel(deadzoneSeekBar.getProgress());
+        deadzoneSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                settings.edit().putInt(deadzonePreferenceForCurrentMode(), progress).apply();
+                updateDeadzoneLabel(progress);
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar bar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar bar) {
+            }
+        });
+    }
+
+    private String deadzonePreferenceForCurrentMode() {
+        return mode_spinner.getSelectedItemPosition() == 6
+                ? "customLaneDeadzonePercent" : "deadzonePercent";
+    }
+
     private void updateSettingsPanel(int mode) {
         settingsPanel.setVisibility(mode >= 3 ? View.VISIBLE : View.GONE);
-        adaptiveSettingsGroup.setVisibility(mode >= 4 ? View.VISIBLE : View.GONE);
-        alternationSettingsGroup.setVisibility(mode >= 4
+        boolean standardAdaptive = mode == 4 || mode == 5;
+        boolean customAdaptive = mode == 6
+                && customLayoutSpinner.getSelectedItemPosition() == MultiKeyMapping.ADAPTIVE_LANES;
+        deadzoneSettingsGroup.setVisibility(mode >= 3 ? View.VISIBLE : View.GONE);
+        adaptiveSettingsGroup.setVisibility(standardAdaptive || customAdaptive
+                ? View.VISIBLE : View.GONE);
+        adaptiveStrategySettingsGroup.setVisibility(standardAdaptive ? View.VISIBLE : View.GONE);
+        alternationSettingsGroup.setVisibility(standardAdaptive
                 && adaptiveStrategySpinner.getSelectedItemPosition() == AdaptiveSplitMapping.RAPID_ALTERNATION
                 ? View.VISIBLE : View.GONE);
         targetWidthSettingsGroup.setVisibility(mode == 5 ? View.VISIBLE : View.GONE);
+        customSettingsGroup.setVisibility(mode == 6 ? View.VISIBLE : View.GONE);
+        settingsTitle.setText(mode == 6
+                ? R.string.custom_settings_title : R.string.two_key_settings_title);
+        deadzoneSeekBar.setProgress(settings.getInt(
+                mode == 6 ? "customLaneDeadzonePercent" : "deadzonePercent", 8));
+        updateDeadzoneLabel(deadzoneSeekBar.getProgress());
         updateMaxShiftLabel(maxShiftSeekBar.getProgress() + 5);
     }
 
     private void updateMaxShiftLabel(int value) {
-        int label = mode_spinner.getSelectedItemPosition() == 5
-                ? R.string.max_target_shift_label : R.string.max_split_shift_label;
+        int mode = mode_spinner.getSelectedItemPosition();
+        int label = mode == 5 ? R.string.max_target_shift_label
+                : mode == 6 ? R.string.max_lane_shift_label : R.string.max_split_shift_label;
         maxShiftLabel.setText(getString(label, value));
+    }
+
+    private void updateDeadzoneLabel(int value) {
+        int label = mode_spinner.getSelectedItemPosition() == 6
+                ? R.string.deadzone_lane_label : R.string.deadzone_width_label;
+        deadzoneLabel.setText(getString(label, value));
+    }
+
+    private void rebuildMidiNotePickers(int keyCount) {
+        customNoteMappingContainer.removeAllViews();
+        for (int i = 0; i < keyCount; i++) {
+            final int keyIndex = i;
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+
+            TextView label = new TextView(this);
+            label.setText(getString(R.string.custom_key_note_label, keyIndex + 1));
+            label.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            row.addView(label, new LinearLayout.LayoutParams(0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+            NumberPicker notePicker = new NumberPicker(this);
+            notePicker.setMinValue(0);
+            notePicker.setMaxValue(127);
+            notePicker.setWrapSelectorWheel(false);
+            notePicker.setValue(settings.getInt("customMidiNote" + keyIndex, 60 + keyIndex));
+            notePicker.setOnValueChangedListener((picker, oldValue, newValue) ->
+                    settings.edit().putInt("customMidiNote" + keyIndex, newValue).apply());
+            row.addView(notePicker, new LinearLayout.LayoutParams(
+                    (int) (112 * getResources().getDisplayMetrics().density),
+                    LinearLayout.LayoutParams.WRAP_CONTENT));
+            customNoteMappingContainer.addView(row, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT));
+        }
     }
 
     private interface ProgressCallback {
@@ -233,6 +354,18 @@ public class MainActivity extends AppCompatActivity {
         intent.putExtra("maxShiftPercent", maxShiftSeekBar.getProgress() + 5);
         intent.putExtra("alternationIntervalMs", alternationIntervalSeekBar.getProgress() + 100);
         intent.putExtra("targetWidthPercent", targetWidthSeekBar.getProgress() + 10);
+        if (selectedMode == 6) {
+            int keyCount = customKeyCountSeekBar.getProgress() + MultiKeyMapping.MIN_KEYS;
+            int[] notes = new int[keyCount];
+            for (int i = 0; i < keyCount; i++) {
+                notes[i] = settings.getInt("customMidiNote" + i, 60 + i);
+            }
+            intent.putExtra("customKeyCount", keyCount);
+            intent.putExtra("customNotes", notes);
+            intent.putExtra("customLayout", customLayoutSpinner.getSelectedItemPosition());
+            intent.putExtra("customDeadzonePercent", deadzoneSeekBar.getProgress());
+            intent.putExtra("midiChannel", customChannelPicker.getValue());
+        }
         startActivity(intent);
     };
 

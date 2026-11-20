@@ -73,6 +73,64 @@ final class TwoKeyOverlayRenderer {
         drawCaption(canvas, width, density, caption);
     }
 
+    static void drawMultiKey(Canvas canvas, int width, int height, float density,
+                             MultiKeyMapping mapping, int midiChannel,
+                             String layoutName, String deadzoneLabel) {
+        int keyCount = mapping.getKeyCount();
+        int deadzonePercent = mapping.getDeadzonePercent();
+        float[] centers = new float[keyCount];
+
+        for (int i = 0; i < keyCount; i++) {
+            centers[i] = mapping.getCenterRatio(i);
+            float left = 0f;
+            float right = width;
+            if (i > 0) {
+                float spacing = centers[i] - centers[i - 1];
+                left = (centers[i] + centers[i - 1]) * width / 2f
+                        + spacing * width * deadzonePercent / 200f;
+            }
+            if (i < keyCount - 1) {
+                float spacing = centers[i + 1] - centers[i];
+                right = (centers[i] + centers[i + 1]) * width / 2f
+                        - spacing * width * deadzonePercent / 200f;
+            }
+
+            float hue = 360f * i / keyCount;
+            int laneColor = Color.HSVToColor(136, new float[]{hue, 0.65f, 0.82f});
+            canvas.drawRect(left, 0, right, height, fill(laneColor));
+
+            Paint notePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            notePaint.setColor(Color.WHITE);
+            notePaint.setTextSize(Math.min(14f * density, (right - left) * 0.35f));
+            notePaint.setFakeBoldText(true);
+            String note = Integer.toString(mapping.getNote(i));
+            canvas.drawText(note, centers[i] * width - notePaint.measureText(note) / 2f,
+                    height * 0.58f, notePaint);
+            drawLine(canvas, centers[i] * width, height, density);
+        }
+
+        Paint gapPaint = fill(0xDD202020);
+        Paint gapEdge = new Paint(Paint.ANTI_ALIAS_FLAG);
+        gapEdge.setColor(Color.WHITE);
+        gapEdge.setAlpha(210);
+        gapEdge.setStrokeWidth(Math.max(1f, 1.5f * density));
+        for (int i = 0; i < keyCount - 1; i++) {
+            float spacing = centers[i + 1] - centers[i];
+            float midpoint = (centers[i] + centers[i + 1]) * width / 2f;
+            float halfGap = spacing * width * deadzonePercent / 200f;
+            if (halfGap > 0) {
+                canvas.drawRect(midpoint - halfGap, 0, midpoint + halfGap, height, gapPaint);
+                canvas.drawLine(midpoint - halfGap, 0, midpoint - halfGap, height, gapEdge);
+                canvas.drawLine(midpoint + halfGap, 0, midpoint + halfGap, height, gapEdge);
+            } else {
+                drawLine(canvas, midpoint, height, density);
+            }
+        }
+
+        drawCaption(canvas, width, density, keyCount + " keys | " + layoutName
+                + " | MIDI ch " + midiChannel + " | " + deadzoneLabel);
+    }
+
     private static void drawDeadzone(Canvas canvas, float left, float right,
                                      int height, float density) {
         if (right <= left) {

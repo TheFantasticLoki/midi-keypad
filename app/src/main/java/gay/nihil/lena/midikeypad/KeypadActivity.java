@@ -37,6 +37,10 @@ public class KeypadActivity extends AppCompatActivity {
 
     KeypadHandler handler;
 
+    private final MidiNoteTracker noteTracker = new MidiNoteTracker();
+
+    int midiChannel = 3;
+
     int mode = 0;
 
     @SuppressLint("ClickableViewAccessibility")
@@ -69,12 +73,13 @@ public class KeypadActivity extends AppCompatActivity {
     private static final byte[] buffer = new byte[3];
 
     void sendNote(boolean on, int code) {
-        int channel = 3; // MIDI channels 1-16 are encoded as 0-15.
-
+        if (!noteTracker.shouldSend(on, code)) {
+            return;
+        }
         if (on) {
-            buffer[0] = (byte) (0x90 + (channel - 1)); // note on
+            buffer[0] = (byte) (0x90 + (midiChannel - 1)); // note on
         } else {
-            buffer[0] = (byte) (0x80 + (channel - 1)); // note off
+            buffer[0] = (byte) (0x80 + (midiChannel - 1)); // note off
         }
 
         buffer[1] = (byte) code; // pitch is middle C
@@ -109,6 +114,9 @@ public class KeypadActivity extends AppCompatActivity {
         actionBar.hide();
 
         mode = getIntent().getIntExtra("mode", 0);
+        if (mode == 6) {
+            midiChannel = Math.max(1, Math.min(16, getIntent().getIntExtra("midiChannel", 3)));
+        }
 
         if (getIntent().getBooleanExtra("orientation", false)) {
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
@@ -152,6 +160,24 @@ public class KeypadActivity extends AppCompatActivity {
                         getIntent().getIntExtra("adaptiveStrategy", AdaptiveSplitMapping.POSITION_HISTORY),
                         getIntent().getIntExtra("alternationIntervalMs", 200));
                 break;
+            case 6: {
+                drawable = AppCompatResources.getDrawable(this, R.drawable.mode0);
+                int keyCount = Math.max(MultiKeyMapping.MIN_KEYS,
+                        Math.min(MultiKeyMapping.MAX_KEYS, getIntent().getIntExtra("customKeyCount", 4)));
+                int[] customNotes = getIntent().getIntArrayExtra("customNotes");
+                if (customNotes == null || customNotes.length != keyCount) {
+                    customNotes = new int[keyCount];
+                    for (int i = 0; i < keyCount; i++) {
+                        customNotes[i] = 60 + i;
+                    }
+                }
+                handler = new MultiKeyKeypadHandler(binding.fullscreenContent, customNotes,
+                        midiChannel, getIntent().getIntExtra("customDeadzonePercent", 8),
+                        getIntent().getIntExtra("historySize", 12),
+                        getIntent().getIntExtra("maxShiftPercent", 8),
+                        getIntent().getIntExtra("customLayout", MultiKeyMapping.STATIC_LANES));
+                break;
+            }
         }
         binding.fullscreenContent.setImageDrawable(drawable);
         binding.keypadOverlay.setHandler(handler);
