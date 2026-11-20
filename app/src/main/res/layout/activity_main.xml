@@ -222,8 +222,8 @@
                             android:id="@+id/target_width_seekbar"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:max="40"
-                            android:progress="30" />
+                            android:max="48"
+                            android:progress="38" />
 
                         <TextView
                             android:layout_width="match_parent"

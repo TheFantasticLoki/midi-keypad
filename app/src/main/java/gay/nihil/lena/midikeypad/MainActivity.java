@@ -126,8 +126,9 @@ public class MainActivity extends AppCompatActivity {
         configureSeekBar(alternationIntervalSeekBar, "alternationInterval",
                 value -> alternationIntervalLabel.setText(
                         getString(R.string.alternation_interval_label, value + 100)));
+        migrateTargetWidthSetting();
         configureSeekBar(targetWidthSeekBar, "targetWidth",
-                value -> targetWidthLabel.setText(getString(R.string.target_width_label, value + 10)));
+                value -> targetWidthLabel.setText(getString(R.string.target_width_label, value + 2)));
         configureSeekBar(customKeyCountSeekBar, "customKeyCountProgress", value -> {
             int keyCount = value + MultiKeyMapping.MIN_KEYS;
             customKeyCountLabel.setText(getString(R.string.custom_key_count_label, keyCount));
@@ -191,6 +192,18 @@ public class MainActivity extends AppCompatActivity {
             public void onStopTrackingTouch(SeekBar bar) {
             }
         });
+    }
+
+    private void migrateTargetWidthSetting() {
+        if (settings.getBoolean("targetWidthMinimumUpdated", false)) {
+            return;
+        }
+
+        SharedPreferences.Editor editor = settings.edit();
+        if (settings.contains("targetWidth")) {
+            editor.putInt("targetWidth", settings.getInt("targetWidth", 0) + 8);
+        }
+        editor.putBoolean("targetWidthMinimumUpdated", true).apply();
     }
 
     private void configureDeadzoneSeekBar() {
@@ -353,7 +366,7 @@ public class MainActivity extends AppCompatActivity {
         intent.putExtra("historySize", historySeekBar.getProgress() + 4);
         intent.putExtra("maxShiftPercent", maxShiftSeekBar.getProgress() + 5);
         intent.putExtra("alternationIntervalMs", alternationIntervalSeekBar.getProgress() + 100);
-        intent.putExtra("targetWidthPercent", targetWidthSeekBar.getProgress() + 10);
+        intent.putExtra("targetWidthPercent", targetWidthSeekBar.getProgress() + 2);
         if (selectedMode == 6) {
             int keyCount = customKeyCountSeekBar.getProgress() + MultiKeyMapping.MIN_KEYS;
             int[] notes = new int[keyCount];
