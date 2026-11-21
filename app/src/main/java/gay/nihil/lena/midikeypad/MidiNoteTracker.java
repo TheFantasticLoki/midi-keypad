@@ -1,34 +1,72 @@
 package gay.nihil.lena.midikeypad;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 final class MidiNoteTracker {
-    private final Map<Integer, Integer> activeNotes = new HashMap<>();
+    private static final class NoteState {
+        int activePointers;
+        boolean sounding;
+    }
 
-    boolean shouldSend(boolean on, int note) {
-        int count = activeNotes.containsKey(note) ? activeNotes.get(note) : 0;
-        if (on) {
-            activeNotes.put(note, count + 1);
-            return count == 0;
+    private final Map<Integer, NoteState> notes = new HashMap<>();
+
+    boolean noteOn(int note) {
+        NoteState state = notes.get(note);
+        if (state == null) {
+            state = new NoteState();
+            notes.put(note, state);
         }
-        if (count == 0) {
+        boolean wasInactive = state.activePointers == 0;
+        state.activePointers++;
+        return wasInactive || !state.sounding;
+    }
+
+    boolean noteOff(int note) {
+        NoteState state = notes.get(note);
+        if (state == null || state.activePointers == 0) {
             return false;
         }
-        if (count == 1) {
-            activeNotes.remove(note);
+
+        state.activePointers--;
+        if (state.activePointers != 0) {
+            return false;
+        }
+        if (state.sounding) {
             return true;
         }
-        activeNotes.put(note, count - 1);
+
+        notes.remove(note);
         return false;
     }
 
-    void noteOnSendFailed(int note) {
-        int count = activeNotes.containsKey(note) ? activeNotes.get(note) : 0;
-        if (count <= 1) {
-            activeNotes.remove(note);
-        } else {
-            activeNotes.put(note, count - 1);
+    void noteOnSent(int note) {
+        NoteState state = notes.get(note);
+        if (state != null) {
+            state.sounding = true;
         }
+    }
+
+    void noteOffSent(int note) {
+        NoteState state = notes.get(note);
+        if (state != null) {
+            state.sounding = false;
+            if (state.activePointers == 0) {
+                notes.remove(note);
+            }
+        }
+    }
+
+    List<Integer> pendingNoteOffs() {
+        List<Integer> pending = new ArrayList<>();
+        for (Map.Entry<Integer, NoteState> entry : notes.entrySet()) {
+            NoteState state = entry.getValue();
+            if (state.activePointers == 0 && state.sounding) {
+                pending.add(entry.getKey());
+            }
+        }
+        return pending;
     }
 }

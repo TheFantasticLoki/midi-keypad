@@ -18,6 +18,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowInsets;
@@ -51,7 +52,6 @@ public class KeypadActivity extends AppCompatActivity {
         if (port == null) {
             return false;
         }
-        Log.i("a", "" + event.getEventTime());
 
         if (handler == null) {
             return false;
@@ -83,6 +83,7 @@ public class KeypadActivity extends AppCompatActivity {
                 if (data.on) {
                     int pointerId = event.getPointerId(event.getActionIndex());
                     activePointerNotes.put(pointerId, data.code);
+                    performTapHapticFeedback(v);
                 }
                 sendNote(data.on, data.code);
             }
@@ -92,12 +93,24 @@ public class KeypadActivity extends AppCompatActivity {
         return false;
     };
 
+    private void performTapHapticFeedback(View view) {
+        int feedbackConstant = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1
+                ? HapticFeedbackConstants.KEYBOARD_TAP
+                : HapticFeedbackConstants.VIRTUAL_KEY;
+        view.performHapticFeedback(feedbackConstant);
+    }
+
     private static final byte[] buffer = new byte[3];
 
     void sendNote(boolean on, int code) {
-        if (!noteTracker.shouldSend(on, code)) {
+        boolean shouldSend = on ? noteTracker.noteOn(code) : noteTracker.noteOff(code);
+        if (!shouldSend) {
             return;
         }
+        sendMidiMessage(on, code);
+    }
+
+    private void sendMidiMessage(boolean on, int code) {
         if (on) {
             buffer[0] = (byte) (0x90 + (midiChannel - 1)); // note on
         } else {
@@ -111,10 +124,12 @@ public class KeypadActivity extends AppCompatActivity {
         try {
             // post is non-blocking
             port.send(buffer, offset, 3);
-        } catch (IOException e) {
             if (on) {
-                noteTracker.noteOnSendFailed(code);
+                noteTracker.noteOnSent(code);
+            } else {
+                noteTracker.noteOffSent(code);
             }
+        } catch (IOException e) {
             Toast.makeText(getApplicationContext(), "Error while transmitting data", Toast.LENGTH_LONG).show();
         }
     }
@@ -124,6 +139,9 @@ public class KeypadActivity extends AppCompatActivity {
             sendNote(false, note);
         }
         activePointerNotes.clear();
+        for (int note : noteTracker.pendingNoteOffs()) {
+            sendMidiMessage(false, note);
+        }
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -145,8 +163,8 @@ public class KeypadActivity extends AppCompatActivity {
         ActionBar actionBar = Objects.requireNonNull(getSupportActionBar());
         actionBar.hide();
 
-        mode = getIntent().getIntExtra("mode", 0);
-        if (mode == 6) {
+        mode = getIntent().getIntExtra("mode", KeypadModes.MASTER);
+        if (mode == KeypadModes.MASTER) {
             midiChannel = Math.max(1, Math.min(16, getIntent().getIntExtra("midiChannel", 3)));
         }
 
@@ -156,46 +174,11 @@ public class KeypadActivity extends AppCompatActivity {
 
         Drawable drawable;
         switch (mode) {
-            default:
-                drawable = AppCompatResources.getDrawable(this, R.drawable.mode0);
-                handler = new OsuStaticKeypadHandler(binding.fullscreenContent);
-                break;
-            case 1:
-                drawable = AppCompatResources.getDrawable(this, R.drawable.mode1);
-                handler = new OsuDynamicKeypadHandler(binding.fullscreenContent);
-                break;
-            case 2:
-                drawable = AppCompatResources.getDrawable(this, R.drawable.mode2);
-                handler = new ManiaStaticKeypadHandler(binding.fullscreenContent);
-                break;
-            case 3:
-                drawable = AppCompatResources.getDrawable(this, R.drawable.mode0);
-                handler = new OsuDeadzoneKeypadHandler(binding.fullscreenContent,
-                        getIntent().getIntExtra("deadzonePercent", 8));
-                break;
-            case 4:
-                drawable = AppCompatResources.getDrawable(this, R.drawable.mode0);
-                handler = new OsuAdaptiveSplitKeypadHandler(binding.fullscreenContent,
-                        getIntent().getIntExtra("deadzonePercent", 8),
-                        getIntent().getIntExtra("historySize", 12),
-                        getIntent().getIntExtra("maxShiftPercent", 8),
-                        getIntent().getIntExtra("adaptiveStrategy", AdaptiveSplitMapping.POSITION_HISTORY),
-                        getIntent().getIntExtra("alternationIntervalMs", 200));
-                break;
-            case 5:
-                drawable = AppCompatResources.getDrawable(this, R.drawable.mode0);
-                handler = new OsuAdaptiveTargetsKeypadHandler(binding.fullscreenContent,
-                        getIntent().getIntExtra("deadzonePercent", 8),
-                        getIntent().getIntExtra("targetWidthPercent", 40),
-                        getIntent().getIntExtra("historySize", 12),
-                        getIntent().getIntExtra("maxShiftPercent", 8),
-                        getIntent().getIntExtra("adaptiveStrategy", AdaptiveSplitMapping.POSITION_HISTORY),
-                        getIntent().getIntExtra("alternationIntervalMs", 200));
-                break;
-            case 6: {
+            case KeypadModes.MASTER: {
                 drawable = AppCompatResources.getDrawable(this, R.drawable.mode0);
                 int keyCount = Math.max(MultiKeyMapping.MIN_KEYS,
-                        Math.min(MultiKeyMapping.MAX_KEYS, getIntent().getIntExtra("customKeyCount", 4)));
+                        Math.min(MultiKeyMapping.MAX_KEYS,
+                                getIntent().getIntExtra("customKeyCount", MultiKeyMapping.MIN_KEYS)));
                 int[] customNotes = getIntent().getIntArrayExtra("customNotes");
                 if (customNotes == null || customNotes.length != keyCount) {
                     customNotes = new int[keyCount];
@@ -207,9 +190,46 @@ public class KeypadActivity extends AppCompatActivity {
                         midiChannel, getIntent().getIntExtra("customDeadzonePercent", 8),
                         getIntent().getIntExtra("historySize", 12),
                         getIntent().getIntExtra("maxShiftPercent", 8),
-                        getIntent().getIntExtra("customLayout", MultiKeyMapping.STATIC_LANES));
+                        getIntent().getIntExtra("customLayout", MultiKeyMapping.ADAPTIVE_LANES));
                 break;
             }
+            case KeypadModes.LEGACY_OSU_STATIC:
+            default:
+                drawable = AppCompatResources.getDrawable(this, R.drawable.mode0);
+                handler = new OsuStaticKeypadHandler(binding.fullscreenContent);
+                break;
+            case KeypadModes.LEGACY_OSU_DYNAMIC:
+                drawable = AppCompatResources.getDrawable(this, R.drawable.mode1);
+                handler = new OsuDynamicKeypadHandler(binding.fullscreenContent);
+                break;
+            case KeypadModes.LEGACY_MANIA:
+                drawable = AppCompatResources.getDrawable(this, R.drawable.mode2);
+                handler = new ManiaStaticKeypadHandler(binding.fullscreenContent);
+                break;
+            case KeypadModes.LEGACY_DEADZONE:
+                drawable = AppCompatResources.getDrawable(this, R.drawable.mode0);
+                handler = new OsuDeadzoneKeypadHandler(binding.fullscreenContent,
+                        getIntent().getIntExtra("deadzonePercent", 8));
+                break;
+            case KeypadModes.LEGACY_ADAPTIVE_SPLIT:
+                drawable = AppCompatResources.getDrawable(this, R.drawable.mode0);
+                handler = new OsuAdaptiveSplitKeypadHandler(binding.fullscreenContent,
+                        getIntent().getIntExtra("deadzonePercent", 8),
+                        getIntent().getIntExtra("historySize", 12),
+                        getIntent().getIntExtra("maxShiftPercent", 8),
+                        getIntent().getIntExtra("adaptiveStrategy", AdaptiveSplitMapping.POSITION_HISTORY),
+                        getIntent().getIntExtra("alternationIntervalMs", 200));
+                break;
+            case KeypadModes.LEGACY_ADAPTIVE_TARGETS:
+                drawable = AppCompatResources.getDrawable(this, R.drawable.mode0);
+                handler = new OsuAdaptiveTargetsKeypadHandler(binding.fullscreenContent,
+                        getIntent().getIntExtra("deadzonePercent", 8),
+                        getIntent().getIntExtra("targetWidthPercent", 40),
+                        getIntent().getIntExtra("historySize", 12),
+                        getIntent().getIntExtra("maxShiftPercent", 8),
+                        getIntent().getIntExtra("adaptiveStrategy", AdaptiveSplitMapping.POSITION_HISTORY),
+                        getIntent().getIntExtra("alternationIntervalMs", 200));
+                break;
         }
         binding.fullscreenContent.setImageDrawable(drawable);
         binding.keypadOverlay.setHandler(handler);
@@ -220,21 +240,47 @@ public class KeypadActivity extends AppCompatActivity {
         MidiDeviceInfo info = getIntent().getParcelableExtra("device");
 
         MidiDeviceInfo.PortInfo[] portInfos = Objects.requireNonNull(info).getPorts();
+        boolean inputPortFound = false;
         for (int j = 0; j < portInfos.length; j++) {
             String portName = portInfos[j].getName();
             if (portInfos[j].getType() == MidiDeviceInfo.PortInfo.TYPE_INPUT) {
+                inputPortFound = true;
                 int finalJ = j;
                 m.openDevice(info, dev -> {
                     if (dev == null) {
                         Toast.makeText(getApplicationContext(), "Could not open device " + portName, Toast.LENGTH_LONG).show();
                         finish();
+                    } else if (isFinishing() || isDestroyed()) {
+                        closeDevice(dev);
                     } else {
-                        port = dev.openInputPort(finalJ);
-                        device = dev;
+                        MidiInputPort openedPort = dev.openInputPort(finalJ);
+                        if (openedPort == null) {
+                            closeDevice(dev);
+                            Toast.makeText(getApplicationContext(),
+                                    "Could not open MIDI input port " + portName,
+                                    Toast.LENGTH_LONG).show();
+                            finish();
+                        } else {
+                            port = openedPort;
+                            device = dev;
+                        }
                     }
                 }, new Handler(Looper.getMainLooper()));
                 return;
             }
+        }
+        if (!inputPortFound) {
+            Toast.makeText(getApplicationContext(),
+                    "The selected MIDI device has no input port", Toast.LENGTH_LONG).show();
+            finish();
+        }
+    }
+
+    private void closeDevice(MidiDevice midiDevice) {
+        try {
+            midiDevice.close();
+        } catch (IOException e) {
+            Log.e("KeypadActivity", "Failed to close MIDI device", e);
         }
     }
 
@@ -254,15 +300,19 @@ public class KeypadActivity extends AppCompatActivity {
             handler.cancelTouches();
         }
         super.onDestroy();
-        try {
-            if (port != null) {
+        if (port != null) {
+            try {
                 port.close();
+            } catch (IOException e) {
+                Log.e("KeypadActivity", "Failed to close MIDI input port", e);
             }
-            if (device != null) {
+        }
+        if (device != null) {
+            try {
                 device.close();
+            } catch (IOException e) {
+                Log.e("KeypadActivity", "Failed to close MIDI device", e);
             }
-        } catch (IOException e) {
-            // ignored
         }
     }
 }

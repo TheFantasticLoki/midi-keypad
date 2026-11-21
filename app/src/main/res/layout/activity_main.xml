@@ -87,6 +87,45 @@
                     android:textStyle="bold" />
 
                 <LinearLayout
+                    android:id="@+id/master_settings_group"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/custom_key_count_label"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp" />
+
+                    <SeekBar
+                        android:id="@+id/custom_key_count_seekbar"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:max="6"
+                        android:progress="0" />
+
+                    <TextView
+                        android:id="@+id/custom_layout_label"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/custom_layout_label" />
+
+                    <Spinner
+                        android:id="@+id/custom_layout_spinner"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/custom_mode_hint"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <LinearLayout
                     android:id="@+id/deadzone_settings_group"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -239,37 +278,6 @@
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
                     android:visibility="gone">
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/custom_mode_hint"
-                        android:textSize="12sp" />
-
-                    <TextView
-                        android:id="@+id/custom_key_count_label"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp" />
-
-                    <SeekBar
-                        android:id="@+id/custom_key_count_seekbar"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:max="8"
-                        android:progress="2" />
-
-                    <TextView
-                        android:id="@+id/custom_layout_label"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/custom_layout_label" />
-
-                    <Spinner
-                        android:id="@+id/custom_layout_spinner"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content" />
 
                     <TextView
                         android:id="@+id/custom_channel_label"

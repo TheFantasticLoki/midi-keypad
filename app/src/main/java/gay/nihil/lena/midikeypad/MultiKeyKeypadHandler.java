@@ -63,7 +63,7 @@ public class MultiKeyKeypadHandler extends KeypadHandler {
     }
 
     private String getDeadzoneLabel() {
-        return "gap " + getDeadzonePercent() + "% lane";
+        return "deadzone " + getDeadzonePercent() + "% screen";
     }
 
     private int getDeadzonePercent() {

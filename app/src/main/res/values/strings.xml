@@ -8,13 +8,13 @@
     <string name="dummy_content">DUMMY\nCONTENT</string>
     <string name="mode_text">Mode </string>
     <string-array name="modes">
-        <item>0 (osu!) (splits screen in 2 keys)</item>
-        <item>1 (osu!) (dynamic finger detection)</item>
-        <item>2 (osu!mania 4K) (splits screen in 4 keys)</item>
-        <item>3 (osu!) (fixed center deadzone)</item>
-        <item>4 (osu!) (adaptive split)</item>
-        <item>5 (osu!) (adaptive buttons)</item>
-        <item>6 (Custom MIDI keypad) (2–10 keys)</item>
+        <item>0 Master mode</item>
+        <item>1 (legacy osu!) (splits screen in 2 keys)</item>
+        <item>2 (legacy osu!) (dynamic finger detection)</item>
+        <item>3 (legacy osu!mania 4K) (splits screen in 4 keys)</item>
+        <item>4 (legacy osu!) (fixed center deadzone)</item>
+        <item>5 (legacy osu!) (adaptive split)</item>
+        <item>6 (legacy osu!) (adaptive buttons)</item>
     </string-array>
     <string-array name="adaptive_strategies">
         <item>Recent position history</item>
@@ -22,7 +22,7 @@
     </string-array>
     <string-array name="custom_layouts">
         <item>Static equal-width lanes</item>
-        <item>Adaptive recent-touch centers</item>
+        <item>Dynamic adaptive lane centers</item>
     </string-array>
     <string name="select_mode_text">Select mode</string>
     <string name="select_midi_device_text">Select MIDI device</string>
@@ -32,8 +32,7 @@
     <string name="device_null_error_text">Error with the selected device.</string>
     <string name="two_key_settings_title">Two-key settings</string>
     <string name="deadzone_width_label">Deadzone width: %1$d%% of screen width</string>
-    <string name="deadzone_lane_label">Lane gap: %1$d%% between lane centers</string>
-    <string name="deadzone_hint">Touches in the gap between keys are ignored.</string>
+    <string name="deadzone_hint">Gap width is a percentage of screen width and is capped to keep every key tappable.</string>
     <string name="adaptive_strategy_label">Adaptive strategy</string>
     <string name="adaptive_strategy_hint">Outside the deadzone, rapid taps alternate keys; slower taps use learned touch positions.</string>
     <string name="history_samples_label">Recent touch history: %1$d taps per key</string>
@@ -43,11 +42,11 @@
     <string name="alternation_interval_label">Rapid tap interval: %1$d ms</string>
     <string name="target_width_label">Target width: %1$d%% of screen width</string>
     <string name="target_width_hint">Taps just outside a target may be accepted within the maximum adaptation range.</string>
-    <string name="custom_settings_title">Custom keypad settings</string>
+    <string name="master_settings_title">Master mode settings</string>
     <string name="custom_key_count_label">Number of keys: %1$d</string>
     <string name="custom_layout_label">Lane placement</string>
     <string name="custom_channel_label">MIDI channel (shared by all keys)</string>
     <string name="custom_notes_label">MIDI note for each key (0–127)</string>
     <string name="custom_key_note_label">Key %1$d note</string>
-    <string name="custom_mode_hint">Set a note for each lane. Adaptive placement learns lane positions from your taps.</string>
+    <string name="custom_mode_hint">Choose the number of keys and whether lane positions stay static or adapt to your taps.</string>
 </resources>

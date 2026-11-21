@@ -77,7 +77,6 @@ final class TwoKeyOverlayRenderer {
                              MultiKeyMapping mapping, int midiChannel,
                              String layoutName, String deadzoneLabel) {
         int keyCount = mapping.getKeyCount();
-        int deadzonePercent = mapping.getDeadzonePercent();
         float[] centers = new float[keyCount];
 
         for (int i = 0; i < keyCount; i++) {
@@ -85,14 +84,12 @@ final class TwoKeyOverlayRenderer {
             float left = 0f;
             float right = width;
             if (i > 0) {
-                float spacing = centers[i] - centers[i - 1];
                 left = (centers[i] + centers[i - 1]) * width / 2f
-                        + spacing * width * deadzonePercent / 200f;
+                        + mapping.getDeadzoneHalfWidthRatio(i - 1) * width;
             }
             if (i < keyCount - 1) {
-                float spacing = centers[i + 1] - centers[i];
                 right = (centers[i] + centers[i + 1]) * width / 2f
-                        - spacing * width * deadzonePercent / 200f;
+                        - mapping.getDeadzoneHalfWidthRatio(i) * width;
             }
 
             float hue = 360f * i / keyCount;
@@ -106,6 +103,15 @@ final class TwoKeyOverlayRenderer {
             String note = Integer.toString(mapping.getNote(i));
             canvas.drawText(note, centers[i] * width - notePaint.measureText(note) / 2f,
                     height * 0.58f, notePaint);
+            if (mapping.isAdaptive()) {
+                String center = Math.round(centers[i] * 100) + "%";
+                Paint centerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                centerPaint.setColor(Color.WHITE);
+                centerPaint.setTextSize(Math.min(10f * density, (right - left) * 0.25f));
+                float centerTextWidth = centerPaint.measureText(center);
+                canvas.drawText(center, centers[i] * width - centerTextWidth / 2f,
+                        height * 0.66f, centerPaint);
+            }
             drawLine(canvas, centers[i] * width, height, density);
         }
 
@@ -115,9 +121,8 @@ final class TwoKeyOverlayRenderer {
         gapEdge.setAlpha(210);
         gapEdge.setStrokeWidth(Math.max(1f, 1.5f * density));
         for (int i = 0; i < keyCount - 1; i++) {
-            float spacing = centers[i + 1] - centers[i];
             float midpoint = (centers[i] + centers[i + 1]) * width / 2f;
-            float halfGap = spacing * width * deadzonePercent / 200f;
+            float halfGap = mapping.getDeadzoneHalfWidthRatio(i) * width;
             if (halfGap > 0) {
                 canvas.drawRect(midpoint - halfGap, 0, midpoint + halfGap, height, gapPaint);
                 canvas.drawLine(midpoint - halfGap, 0, midpoint - halfGap, height, gapEdge);

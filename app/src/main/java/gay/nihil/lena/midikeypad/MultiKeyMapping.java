@@ -9,7 +9,7 @@ final class MultiKeyMapping {
     static final int STATIC_LANES = 0;
     static final int ADAPTIVE_LANES = 1;
     static final int MIN_KEYS = 2;
-    static final int MAX_KEYS = 10;
+    static final int MAX_KEYS = 8;
 
     private final int keyCount;
     private final int[] notes;
@@ -24,7 +24,7 @@ final class MultiKeyMapping {
     MultiKeyMapping(int[] notes, int deadzonePercent, int historySize,
                     int maxShiftPercent, int layout) {
         if (notes.length < MIN_KEYS || notes.length > MAX_KEYS) {
-            throw new IllegalArgumentException("Key count must be between 2 and 10");
+            throw new IllegalArgumentException("Key count must be between 2 and 8");
         }
 
         keyCount = notes.length;
@@ -47,14 +47,18 @@ final class MultiKeyMapping {
         }
 
         float position = clamp(x / width, 0f, 0.999999f);
-        int keyIndex = adaptive ? adaptiveKeyAt(position) : staticKeyAt(position);
+        if (adaptive) {
+            int keyIndex = nearestAdaptiveKeyAt(position);
+            boolean inDeadzone = adaptiveDeadzoneAt(position);
+            recordPosition(keyIndex, position);
+            return inDeadzone ? null : notes[keyIndex];
+        }
+
+        int keyIndex = staticKeyAt(position);
         if (keyIndex < 0) {
             return null;
         }
 
-        if (adaptive) {
-            recordPosition(keyIndex, position);
-        }
         return notes[keyIndex];
     }
 
@@ -70,6 +74,14 @@ final class MultiKeyMapping {
         return centers[keyIndex];
     }
 
+    float getDeadzoneHalfWidthRatio(int boundaryIndex) {
+        float spacing = adaptive
+                ? centers[boundaryIndex + 1] - centers[boundaryIndex]
+                : 1f / keyCount;
+        float requestedHalfWidth = Math.max(0, deadzonePercent) / 200f;
+        return Math.min(requestedHalfWidth, spacing * 0.45f);
+    }
+
     boolean isAdaptive() {
         return adaptive;
     }
@@ -81,24 +93,29 @@ final class MultiKeyMapping {
     private int staticKeyAt(float position) {
         float scaledPosition = position * keyCount;
         float nearestBoundary = Math.round(scaledPosition);
-        if (deadzonePercent > 0 && nearestBoundary > 0 && nearestBoundary < keyCount
-                && Math.abs(scaledPosition - nearestBoundary) <= deadzonePercent / 200f) {
-            return -1;
+        if (deadzonePercent > 0 && nearestBoundary > 0 && nearestBoundary < keyCount) {
+            float boundaryRatio = nearestBoundary / keyCount;
+            if (Math.abs(position - boundaryRatio)
+                    <= getDeadzoneHalfWidthRatio((int) nearestBoundary - 1)) {
+                return -1;
+            }
         }
         return Math.min(keyCount - 1, (int) scaledPosition);
     }
 
-    private int adaptiveKeyAt(float position) {
+    private boolean adaptiveDeadzoneAt(float position) {
         for (int i = 0; i < keyCount - 1; i++) {
-            float spacing = centers[i + 1] - centers[i];
             float boundary = (centers[i] + centers[i + 1]) / 2f;
-            float deadzoneHalfWidth = spacing * deadzonePercent / 200f;
+            float deadzoneHalfWidth = getDeadzoneHalfWidthRatio(i);
             if (deadzonePercent > 0
                     && Math.abs(position - boundary) <= deadzoneHalfWidth) {
-                return -1;
+                return true;
             }
         }
+        return false;
+    }
 
+    private int nearestAdaptiveKeyAt(float position) {
         int nearest = 0;
         float nearestDistance = Math.abs(position - centers[0]);
         for (int i = 1; i < keyCount; i++) {

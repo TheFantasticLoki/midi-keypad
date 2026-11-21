@@ -51,6 +51,7 @@ public class MainActivity extends AppCompatActivity {
     LinearLayout adaptiveStrategySettingsGroup;
     LinearLayout alternationSettingsGroup;
     LinearLayout targetWidthSettingsGroup;
+    LinearLayout masterSettingsGroup;
     LinearLayout customSettingsGroup;
     LinearLayout customNoteMappingContainer;
 
@@ -60,6 +61,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         settings = getSharedPreferences("keypad_settings", MODE_PRIVATE);
+        migrateModeSetting();
         startButton = findViewById(R.id.start_button);
         showMeButton = findViewById(R.id.show_me_button);
         mode_spinner = findViewById(R.id.mode_spinner);
@@ -87,6 +89,7 @@ public class MainActivity extends AppCompatActivity {
         adaptiveStrategySettingsGroup = findViewById(R.id.adaptive_strategy_settings_group);
         alternationSettingsGroup = findViewById(R.id.alternation_settings_group);
         targetWidthSettingsGroup = findViewById(R.id.target_width_settings_group);
+        masterSettingsGroup = findViewById(R.id.master_settings_group);
         customSettingsGroup = findViewById(R.id.custom_keypad_settings_group);
         customNoteMappingContainer = findViewById(R.id.custom_note_mapping_container);
 
@@ -97,7 +100,7 @@ public class MainActivity extends AppCompatActivity {
                 R.array.modes, android.R.layout.simple_spinner_item);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         mode_spinner.setAdapter(adapter);
-        mode_spinner.setSelection(settings.getInt("mode", 0));
+        mode_spinner.setSelection(settings.getInt("mode", KeypadModes.MASTER));
 
         ArrayAdapter<CharSequence> strategyAdapter = ArrayAdapter.createFromResource(this,
                 R.array.adaptive_strategies, android.R.layout.simple_spinner_item);
@@ -109,7 +112,8 @@ public class MainActivity extends AppCompatActivity {
                 R.array.custom_layouts, android.R.layout.simple_spinner_item);
         customLayoutAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         customLayoutSpinner.setAdapter(customLayoutAdapter);
-        customLayoutSpinner.setSelection(settings.getInt("customLayout", MultiKeyMapping.STATIC_LANES));
+        customLayoutSpinner.setSelection(settings.getInt(
+                "customLayout", MultiKeyMapping.ADAPTIVE_LANES));
 
         customChannelPicker.setMinValue(1);
         customChannelPicker.setMaxValue(16);
@@ -194,6 +198,21 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void migrateModeSetting() {
+        if (settings.getInt("modeOrderVersion", 0) >= 1) {
+            return;
+        }
+
+        SharedPreferences.Editor editor = settings.edit();
+        if (settings.contains("mode")) {
+            editor.putInt("mode",
+                    KeypadModes.fromPreviousModeOrder(settings.getInt("mode", 0)));
+        } else {
+            editor.putInt("mode", KeypadModes.MASTER);
+        }
+        editor.putInt("modeOrderVersion", 1).apply();
+    }
+
     private void migrateTargetWidthSetting() {
         if (settings.getBoolean("targetWidthMinimumUpdated", false)) {
             return;
@@ -227,43 +246,47 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private String deadzonePreferenceForCurrentMode() {
-        return mode_spinner.getSelectedItemPosition() == 6
+        return mode_spinner.getSelectedItemPosition() == KeypadModes.MASTER
                 ? "customLaneDeadzonePercent" : "deadzonePercent";
     }
 
     private void updateSettingsPanel(int mode) {
-        settingsPanel.setVisibility(mode >= 3 ? View.VISIBLE : View.GONE);
-        boolean standardAdaptive = mode == 4 || mode == 5;
-        boolean customAdaptive = mode == 6
+        boolean masterMode = mode == KeypadModes.MASTER;
+        boolean hasDeadzoneSettings = masterMode || mode >= KeypadModes.LEGACY_DEADZONE;
+        settingsPanel.setVisibility(hasDeadzoneSettings ? View.VISIBLE : View.GONE);
+        boolean standardAdaptive = mode == KeypadModes.LEGACY_ADAPTIVE_SPLIT
+                || mode == KeypadModes.LEGACY_ADAPTIVE_TARGETS;
+        boolean customAdaptive = masterMode
                 && customLayoutSpinner.getSelectedItemPosition() == MultiKeyMapping.ADAPTIVE_LANES;
-        deadzoneSettingsGroup.setVisibility(mode >= 3 ? View.VISIBLE : View.GONE);
+        deadzoneSettingsGroup.setVisibility(hasDeadzoneSettings ? View.VISIBLE : View.GONE);
         adaptiveSettingsGroup.setVisibility(standardAdaptive || customAdaptive
                 ? View.VISIBLE : View.GONE);
         adaptiveStrategySettingsGroup.setVisibility(standardAdaptive ? View.VISIBLE : View.GONE);
         alternationSettingsGroup.setVisibility(standardAdaptive
                 && adaptiveStrategySpinner.getSelectedItemPosition() == AdaptiveSplitMapping.RAPID_ALTERNATION
                 ? View.VISIBLE : View.GONE);
-        targetWidthSettingsGroup.setVisibility(mode == 5 ? View.VISIBLE : View.GONE);
-        customSettingsGroup.setVisibility(mode == 6 ? View.VISIBLE : View.GONE);
-        settingsTitle.setText(mode == 6
-                ? R.string.custom_settings_title : R.string.two_key_settings_title);
+        targetWidthSettingsGroup.setVisibility(
+                mode == KeypadModes.LEGACY_ADAPTIVE_TARGETS ? View.VISIBLE : View.GONE);
+        masterSettingsGroup.setVisibility(masterMode ? View.VISIBLE : View.GONE);
+        customSettingsGroup.setVisibility(masterMode ? View.VISIBLE : View.GONE);
+        settingsTitle.setText(masterMode
+                ? R.string.master_settings_title : R.string.two_key_settings_title);
         deadzoneSeekBar.setProgress(settings.getInt(
-                mode == 6 ? "customLaneDeadzonePercent" : "deadzonePercent", 8));
+                masterMode ? "customLaneDeadzonePercent" : "deadzonePercent", 8));
         updateDeadzoneLabel(deadzoneSeekBar.getProgress());
         updateMaxShiftLabel(maxShiftSeekBar.getProgress() + 5);
     }
 
     private void updateMaxShiftLabel(int value) {
         int mode = mode_spinner.getSelectedItemPosition();
-        int label = mode == 5 ? R.string.max_target_shift_label
-                : mode == 6 ? R.string.max_lane_shift_label : R.string.max_split_shift_label;
+        int label = mode == KeypadModes.LEGACY_ADAPTIVE_TARGETS ? R.string.max_target_shift_label
+                : mode == KeypadModes.MASTER ? R.string.max_lane_shift_label
+                : R.string.max_split_shift_label;
         maxShiftLabel.setText(getString(label, value));
     }
 
     private void updateDeadzoneLabel(int value) {
-        int label = mode_spinner.getSelectedItemPosition() == 6
-                ? R.string.deadzone_lane_label : R.string.deadzone_width_label;
-        deadzoneLabel.setText(getString(label, value));
+        deadzoneLabel.setText(getString(R.string.deadzone_width_label, value));
     }
 
     private void rebuildMidiNotePickers(int keyCount) {
@@ -308,6 +331,9 @@ public class MainActivity extends AppCompatActivity {
 
             MidiManager m = (MidiManager)getApplicationContext().getSystemService(Context.MIDI_SERVICE);
             MidiDeviceInfo[] infos = m.getDevices();
+            Object selectedItem = device_spinner.getSelectedItem();
+            int previousDeviceId = selectedItem instanceof MidiDeviceSpinnerInfo
+                    ? ((MidiDeviceSpinnerInfo) selectedItem).getInner().getId() : -1;
 
             if (infos.length == 0) {
                 device_spinner.setEnabled(false);
@@ -319,13 +345,17 @@ public class MainActivity extends AppCompatActivity {
             } else {
                 device_spinner.setEnabled(true);
                 MidiDeviceSpinnerInfo[] spinfos = new MidiDeviceSpinnerInfo[infos.length];
-                int def = 0;
+                int defaultIndex = 0;
+                int previousIndex = -1;
                 for (int i = 0; i < infos.length; i++) {
                     MidiDeviceInfo info = infos[i];
                     String manufacturer = info.getProperties().getString("manufacturer");
 
                     if ("Android".equals(manufacturer)) {
-                        def = i;
+                        defaultIndex = i;
+                    }
+                    if (info.getId() == previousDeviceId) {
+                        previousIndex = i;
                     }
                     spinfos[i] = new MidiDeviceSpinnerInfo(info);
                 }
@@ -333,7 +363,7 @@ public class MainActivity extends AppCompatActivity {
                 ArrayAdapter<MidiDeviceSpinnerInfo> adapter1 = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, spinfos);
                 adapter1.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
                 device_spinner.setAdapter(adapter1);
-                device_spinner.setSelection(def);
+                device_spinner.setSelection(previousIndex >= 0 ? previousIndex : defaultIndex);
             }
 
         } else {
@@ -367,7 +397,7 @@ public class MainActivity extends AppCompatActivity {
         intent.putExtra("maxShiftPercent", maxShiftSeekBar.getProgress() + 5);
         intent.putExtra("alternationIntervalMs", alternationIntervalSeekBar.getProgress() + 100);
         intent.putExtra("targetWidthPercent", targetWidthSeekBar.getProgress() + 2);
-        if (selectedMode == 6) {
+        if (selectedMode == KeypadModes.MASTER) {
             int keyCount = customKeyCountSeekBar.getProgress() + MultiKeyMapping.MIN_KEYS;
             int[] notes = new int[keyCount];
             for (int i = 0; i < keyCount; i++) {
