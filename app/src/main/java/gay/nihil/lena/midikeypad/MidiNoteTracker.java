@@ -22,4 +22,13 @@ final class MidiNoteTracker {
         activeNotes.put(note, count - 1);
         return false;
     }
+
+    void noteOnSendFailed(int note) {
+        int count = activeNotes.containsKey(note) ? activeNotes.get(note) : 0;
+        if (count <= 1) {
+            activeNotes.remove(note);
+        } else {
+            activeNotes.put(note, count - 1);
+        }
+    }
 }

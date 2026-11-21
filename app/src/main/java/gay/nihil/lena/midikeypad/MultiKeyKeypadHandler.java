@@ -51,6 +51,11 @@ public class MultiKeyKeypadHandler extends KeypadHandler {
     }
 
     @Override
+    public void cancelTouches() {
+        pointerNotes.clear();
+    }
+
+    @Override
     public void drawOverlay(Canvas canvas, int width, int height, float density) {
         TwoKeyOverlayRenderer.drawMultiKey(canvas, width, height, density, mapping,
                 midiChannel, mapping.isAdaptive() ? "adaptive" : "static",

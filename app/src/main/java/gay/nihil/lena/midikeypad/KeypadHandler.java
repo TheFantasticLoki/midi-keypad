@@ -13,6 +13,9 @@ public abstract class KeypadHandler {
 
     public abstract KeypadData HandleMotionEvent(MotionEvent event);
 
+    public void cancelTouches() {
+    }
+
     public void drawOverlay(Canvas canvas, int width, int height, float density) {
     }
 }

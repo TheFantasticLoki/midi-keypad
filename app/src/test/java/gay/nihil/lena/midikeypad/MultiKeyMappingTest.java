@@ -70,4 +70,15 @@ public class MultiKeyMappingTest {
         assertTrue(tracker.shouldSend(false, 60));
         assertFalse(tracker.shouldSend(false, 60));
     }
+
+    @Test
+    public void failedNoteOnDoesNotLeaveNoteMarkedActive() {
+        MidiNoteTracker tracker = new MidiNoteTracker();
+
+        assertTrue(tracker.shouldSend(true, 60));
+        tracker.noteOnSendFailed(60);
+
+        assertTrue(tracker.shouldSend(true, 60));
+        assertTrue(tracker.shouldSend(false, 60));
+    }
 }

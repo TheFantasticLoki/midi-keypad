@@ -4,17 +4,16 @@ import android.view.MotionEvent;
 import android.view.View;
 
 import java.util.HashMap;
-import java.util.Objects;
 
 public class ManiaStaticKeypadHandler extends KeypadHandler {
     public ManiaStaticKeypadHandler(View view) {
         super(view);
     }
 
-    // stores pairs of: action index -> code
+    // Stores each pointer's original note so moving a finger does not change its release.
     // this allows pointer up events to release a pointer's original key,
     // preventing a situation where the finger slides to a different key and a wrong code would be fired
-    private static final HashMap<Integer, Integer> motions = new HashMap<>();
+    private final HashMap<Integer, Integer> motions = new HashMap<>();
 
     @Override
     public KeypadData HandleMotionEvent(MotionEvent event) {
@@ -34,11 +33,18 @@ public class ManiaStaticKeypadHandler extends KeypadHandler {
 
             return new KeypadData(true, true, code);
         } else if (actionType == MotionEvent.ACTION_UP || actionType == MotionEvent.ACTION_POINTER_UP) {
-            Integer code = Objects.requireNonNull(motions.get(pointerId));
-            motions.remove(pointerId);
+            Integer code = motions.remove(pointerId);
+            if (code == null) {
+                return new KeypadData(false, false, 0);
+            }
             return new KeypadData(true, false, code);
         } else {
             return new KeypadData(false, false, 0);
         }
+    }
+
+    @Override
+    public void cancelTouches() {
+        motions.clear();
     }
 }

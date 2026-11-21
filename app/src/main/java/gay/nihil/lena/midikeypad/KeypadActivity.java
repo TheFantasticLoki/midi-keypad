@@ -25,6 +25,8 @@ import android.view.WindowInsetsController;
 import android.widget.Toast;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 
 import gay.nihil.lena.midikeypad.databinding.ActivityKeypadBinding;
@@ -38,6 +40,7 @@ public class KeypadActivity extends AppCompatActivity {
     KeypadHandler handler;
 
     private final MidiNoteTracker noteTracker = new MidiNoteTracker();
+    private final Map<Integer, Integer> activePointerNotes = new HashMap<>();
 
     int midiChannel = 3;
 
@@ -54,14 +57,33 @@ public class KeypadActivity extends AppCompatActivity {
             return false;
         }
 
-        KeypadData data = handler.HandleMotionEvent(event);
         int action = event.getActionMasked();
+        if (action == MotionEvent.ACTION_CANCEL) {
+            releaseActivePointerNotes();
+            handler.cancelTouches();
+            return true;
+        }
+
+        KeypadData data = handler.HandleMotionEvent(event);
         if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
             v.invalidate();
         }
 
+        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_POINTER_UP) {
+            int pointerId = event.getPointerId(event.getActionIndex());
+            Integer note = activePointerNotes.remove(pointerId);
+            if (note != null) {
+                sendNote(false, note);
+                return true;
+            }
+        }
+
         if (data != null && data.handled) {
             if (data.sendMidi) {
+                if (data.on) {
+                    int pointerId = event.getPointerId(event.getActionIndex());
+                    activePointerNotes.put(pointerId, data.code);
+                }
                 sendNote(data.on, data.code);
             }
             return true;
@@ -90,8 +112,18 @@ public class KeypadActivity extends AppCompatActivity {
             // post is non-blocking
             port.send(buffer, offset, 3);
         } catch (IOException e) {
+            if (on) {
+                noteTracker.noteOnSendFailed(code);
+            }
             Toast.makeText(getApplicationContext(), "Error while transmitting data", Toast.LENGTH_LONG).show();
         }
+    }
+
+    private void releaseActivePointerNotes() {
+        for (int note : activePointerNotes.values()) {
+            sendNote(false, note);
+        }
+        activePointerNotes.clear();
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -207,7 +239,20 @@ public class KeypadActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onPause() {
+        releaseActivePointerNotes();
+        if (handler != null) {
+            handler.cancelTouches();
+        }
+        super.onPause();
+    }
+
+    @Override
     protected void onDestroy() {
+        releaseActivePointerNotes();
+        if (handler != null) {
+            handler.cancelTouches();
+        }
         super.onDestroy();
         try {
             if (port != null) {

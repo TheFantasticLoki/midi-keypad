@@ -52,4 +52,9 @@ abstract class OsuTwoKeyKeypadHandler extends KeypadHandler {
 
         return new KeypadData(false, false, 0);
     }
+
+    @Override
+    public void cancelTouches() {
+        pointerNotes.clear();
+    }
 }

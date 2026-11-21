@@ -324,7 +324,7 @@ public class MainActivity extends AppCompatActivity {
                     MidiDeviceInfo info = infos[i];
                     String manufacturer = info.getProperties().getString("manufacturer");
 
-                    if (manufacturer.equals("Android")) {
+                    if ("Android".equals(manufacturer)) {
                         def = i;
                     }
                     spinfos[i] = new MidiDeviceSpinnerInfo(info);
