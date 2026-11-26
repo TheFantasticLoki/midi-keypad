@@ -30,6 +30,7 @@ public class MainActivity extends AppCompatActivity {
     Spinner adaptiveStrategySpinner;
     Spinner customLayoutSpinner;
     CheckBox landscapeCheckBox;
+    CheckBox screenContextCheckBox;
     SharedPreferences settings;
     SeekBar deadzoneSeekBar;
     SeekBar historySeekBar;
@@ -67,6 +68,7 @@ public class MainActivity extends AppCompatActivity {
         mode_spinner = findViewById(R.id.mode_spinner);
         device_spinner = findViewById(R.id.device_spinner);
         landscapeCheckBox = findViewById(R.id.landscape_checkbox);
+        screenContextCheckBox = findViewById(R.id.screen_context_checkbox);
         adaptiveStrategySpinner = findViewById(R.id.adaptive_strategy_spinner);
         customLayoutSpinner = findViewById(R.id.custom_layout_spinner);
         deadzoneSeekBar = findViewById(R.id.deadzone_seekbar);
@@ -127,6 +129,11 @@ public class MainActivity extends AppCompatActivity {
                 value -> historyLabel.setText(getString(R.string.history_samples_label, value + 4)));
         configureSeekBar(maxShiftSeekBar, "maxShiftPercent",
                 value -> updateMaxShiftLabel(value + 5));
+        screenContextCheckBox.setChecked(settings.getBoolean("screenContextEnabled", true));
+        screenContextCheckBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            settings.edit().putBoolean("screenContextEnabled", isChecked).apply();
+            updateSettingsPanel(mode_spinner.getSelectedItemPosition());
+        });
         configureSeekBar(alternationIntervalSeekBar, "alternationInterval",
                 value -> alternationIntervalLabel.setText(
                         getString(R.string.alternation_interval_label, value + 100)));
@@ -266,7 +273,8 @@ public class MainActivity extends AppCompatActivity {
                 && adaptiveStrategySpinner.getSelectedItemPosition() == AdaptiveSplitMapping.RAPID_ALTERNATION
                 ? View.VISIBLE : View.GONE);
         targetWidthSettingsGroup.setVisibility(
-                mode == KeypadModes.LEGACY_ADAPTIVE_TARGETS ? View.VISIBLE : View.GONE);
+                mode == KeypadModes.LEGACY_ADAPTIVE_TARGETS || customAdaptive
+                        ? View.VISIBLE : View.GONE);
         masterSettingsGroup.setVisibility(masterMode ? View.VISIBLE : View.GONE);
         customSettingsGroup.setVisibility(masterMode ? View.VISIBLE : View.GONE);
         settingsTitle.setText(masterMode
@@ -408,6 +416,7 @@ public class MainActivity extends AppCompatActivity {
             intent.putExtra("customLayout", customLayoutSpinner.getSelectedItemPosition());
             intent.putExtra("customDeadzonePercent", deadzoneSeekBar.getProgress());
             intent.putExtra("midiChannel", customChannelPicker.getValue());
+            intent.putExtra("screenContextEnabled", screenContextCheckBox.isChecked());
         }
         startActivity(intent);
     };

@@ -15,8 +15,25 @@ public class MultiKeyKeypadHandler extends KeypadHandler {
     public MultiKeyKeypadHandler(View view, int[] notes, int midiChannel,
                                  int deadzonePercent, int historySize,
                                  int maxShiftPercent, int layout) {
+        this(view, notes, midiChannel, deadzonePercent, historySize,
+                maxShiftPercent, layout, true);
+    }
+
+    public MultiKeyKeypadHandler(View view, int[] notes, int midiChannel,
+                                 int deadzonePercent, int historySize,
+                                 int maxShiftPercent, int layout,
+                                 boolean screenContextEnabled) {
+        this(view, notes, midiChannel, deadzonePercent, historySize,
+                maxShiftPercent, layout, screenContextEnabled, 40);
+    }
+
+    public MultiKeyKeypadHandler(View view, int[] notes, int midiChannel,
+                                 int deadzonePercent, int historySize,
+                                 int maxShiftPercent, int layout,
+                                 boolean screenContextEnabled, int targetWidthPercent) {
         super(view);
-        mapping = new MultiKeyMapping(notes, deadzonePercent, historySize, maxShiftPercent, layout);
+        mapping = new MultiKeyMapping(notes, deadzonePercent, historySize,
+                maxShiftPercent, layout, screenContextEnabled, targetWidthPercent);
         this.midiChannel = midiChannel;
     }
 
@@ -27,7 +44,8 @@ public class MultiKeyKeypadHandler extends KeypadHandler {
         int pointerId = event.getPointerId(pointerIndex);
 
         if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
-            Integer note = mapping.noteForTap(event.getX(pointerIndex), view.getWidth());
+            Integer note = mapping.noteForTap(event.getX(pointerIndex),
+                    view.getWidth(), event.getEventTime());
             if (note == null) {
                 pointerNotes.put(pointerId, -1);
                 return KeypadData.consumedOnly();

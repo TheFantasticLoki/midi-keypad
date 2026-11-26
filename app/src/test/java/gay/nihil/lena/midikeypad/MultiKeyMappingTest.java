@@ -80,6 +80,230 @@ public class MultiKeyMappingTest {
     }
 
     @Test
+    public void tapHistoryMovesAdaptiveCentersAsTheHandShifts() {
+        MultiKeyMapping mapping = new MultiKeyMapping(new int[]{60, 61},
+                0, 1, 45, MultiKeyMapping.ADAPTIVE_LANES, true);
+
+        assertEquals(Integer.valueOf(60),
+                mapping.noteForTap(350, 1000, 100));
+        assertEquals(Integer.valueOf(61),
+                mapping.noteForTap(850, 1000, 200));
+
+        assertEquals(0.35f, mapping.getCenterRatio(0), 0.001f);
+        assertEquals(0.85f, mapping.getCenterRatio(1), 0.001f);
+        assertEquals(0.6f, mapping.getDeadzoneCenterRatio(0), 0.001f);
+    }
+
+    @Test
+    public void screenContextCanBeDisabled() {
+        MultiKeyMapping mapping = new MultiKeyMapping(new int[]{60, 61},
+                0, 1, 45, MultiKeyMapping.ADAPTIVE_LANES, false);
+
+        assertEquals(Integer.valueOf(60), mapping.noteForTap(300, 1000, 100));
+        assertEquals(Integer.valueOf(61), mapping.noteForTap(600, 1000, 200));
+
+        assertEquals(0.3f, mapping.getCenterRatio(0), 0.001f);
+        assertEquals(0.6f, mapping.getCenterRatio(1), 0.001f);
+    }
+
+    @Test
+    public void screenClustersFromOneInitialLanePlaceBothCentersAroundTheirMidpoint() {
+        MultiKeyMapping mapping = new MultiKeyMapping(new int[]{60, 61},
+                8, 4, 45, MultiKeyMapping.ADAPTIVE_LANES, true);
+
+        assertEquals(Integer.valueOf(60), mapping.noteForTap(200, 1000, 100));
+        assertEquals(Integer.valueOf(60), mapping.noteForTap(400, 1000, 200));
+        assertEquals(Integer.valueOf(60), mapping.noteForTap(210, 1000, 300));
+        assertEquals(Integer.valueOf(61), mapping.noteForTap(410, 1000, 400));
+
+        assertEquals(0.205f, mapping.getCenterRatio(0), 0.001f);
+        assertEquals(0.405f, mapping.getCenterRatio(1), 0.001f);
+        assertEquals(0.305f, mapping.getDeadzoneCenterRatio(0), 0.001f);
+        assertEquals(-0.195f, mapping.getLayoutShiftRatio(), 0.001f);
+    }
+
+    @Test
+    public void oneTargetMovesInsideItsButtonWithoutMovingTheLaneLayout() {
+        MultiKeyMapping mapping = new MultiKeyMapping(new int[]{60, 61},
+                8, 4, 45, MultiKeyMapping.ADAPTIVE_LANES, true);
+        mapping.noteForTap(200, 1000, 100);
+        mapping.noteForTap(400, 1000, 200);
+        mapping.noteForTap(210, 1000, 300);
+        mapping.noteForTap(410, 1000, 400);
+        float initialShift = mapping.getLayoutShiftRatio();
+
+        mapping.noteForTap(120, 1000, 500);
+
+        assertEquals(0.15f, mapping.getCenterRatio(0), 0.002f);
+        assertEquals(0.405f, mapping.getCenterRatio(1), 0.001f);
+        assertEquals(initialShift, mapping.getLayoutShiftRatio(), 0.001f);
+    }
+
+    @Test
+    public void buttonsRecenterOnlyAfterTargetsShareTheSameDrift() {
+        MultiKeyMapping mapping = new MultiKeyMapping(new int[]{60, 61},
+                8, 4, 45, MultiKeyMapping.ADAPTIVE_LANES, true);
+        mapping.noteForTap(200, 1000, 100);
+        mapping.noteForTap(400, 1000, 200);
+        mapping.noteForTap(210, 1000, 300);
+        mapping.noteForTap(410, 1000, 400);
+        float initialShift = mapping.getLayoutShiftRatio();
+
+        mapping.noteForTap(80, 1000, 500);
+        assertEquals(initialShift, mapping.getLayoutShiftRatio(), 0.001f);
+        mapping.noteForTap(350, 1000, 600);
+
+        assertEquals(initialShift - 0.0585f, mapping.getLayoutShiftRatio(), 0.002f);
+        assertEquals(0.124f, mapping.getCenterRatio(0), 0.002f);
+        assertEquals(0.369f, mapping.getCenterRatio(1), 0.002f);
+    }
+
+    @Test
+    public void adaptiveMasterTargetRejectsFarMissesWithoutLearningThem() {
+        MultiKeyMapping mapping = new MultiKeyMapping(new int[]{60, 61},
+                8, 4, 5, MultiKeyMapping.ADAPTIVE_LANES, false, 10);
+
+        assertNull(mapping.noteForTap(900, 1000, 100));
+        assertEquals(0.25f, mapping.getCenterRatio(0), 0.001f);
+        assertEquals(0.75f, mapping.getCenterRatio(1), 0.001f);
+        assertEquals(10, mapping.getTargetWidthPercent());
+        assertEquals(Integer.valueOf(61), mapping.noteForTap(800, 1000, 500));
+    }
+
+    @Test
+    public void screenContextAcceptedZonesStopAtTheDeadzoneEvenWhenLaneLayoutDiffers() {
+        MultiKeyMapping mapping = new MultiKeyMapping(new int[]{60, 61},
+                11, 4, 45, MultiKeyMapping.ADAPTIVE_LANES, true, 7);
+        mapping.noteForTap(370, 1000, 100);
+        mapping.noteForTap(720, 1000, 200);
+        mapping.noteForTap(400, 1000, 300);
+        mapping.noteForTap(740, 1000, 400);
+
+        assertEquals(0.485f, mapping.getAcceptedEndRatio(0), 0.002f);
+        assertEquals(0.63f, mapping.getAcceptedStartRatio(1), 0.002f);
+        assertEquals(Integer.valueOf(60), mapping.noteForTap(390, 1000, 500));
+        assertNull(mapping.noteForTap(557, 1000, 600));
+        assertEquals(Integer.valueOf(61), mapping.noteForTap(730, 1000, 700));
+    }
+
+    @Test
+    public void repeatedTapsMoveTargetsAndRecenterAsHandShifts() {
+        MultiKeyMapping mapping = new MultiKeyMapping(new int[]{60, 61},
+                8, 4, 45, MultiKeyMapping.ADAPTIVE_LANES, true);
+        mapping.noteForTap(200, 1000, 100);
+        mapping.noteForTap(400, 1000, 200);
+        mapping.noteForTap(210, 1000, 300);
+        mapping.noteForTap(410, 1000, 400);
+
+        float initialSpacing = mapping.getCenterRatio(1) - mapping.getCenterRatio(0);
+        float initialLayoutShift = mapping.getLayoutShiftRatio();
+        mapping.noteForTap(150, 1000, 500);
+        mapping.noteForTap(450, 1000, 550);
+        mapping.noteForTap(120, 1000, 600);
+        mapping.noteForTap(480, 1000, 650);
+
+        assertTrue(mapping.getCenterRatio(0) < 0.15f);
+        assertTrue(mapping.getCenterRatio(1) > 0.45f);
+        assertEquals(initialLayoutShift, mapping.getLayoutShiftRatio(), 0.001f);
+        assertTrue(mapping.getCenterRatio(1) - mapping.getCenterRatio(0) > initialSpacing);
+    }
+
+    @Test
+    public void repeatedTapsCatchUpAfterAnAbruptHandShift() {
+        MultiKeyMapping mapping = new MultiKeyMapping(new int[]{60, 61},
+                8, 4, 45, MultiKeyMapping.ADAPTIVE_LANES, true);
+        mapping.noteForTap(200, 1000, 100);
+        mapping.noteForTap(400, 1000, 200);
+        mapping.noteForTap(210, 1000, 300);
+        mapping.noteForTap(410, 1000, 400);
+
+        mapping.noteForTap(400, 1000, 500);
+        mapping.noteForTap(600, 1000, 550);
+        mapping.noteForTap(400, 1000, 600);
+        mapping.noteForTap(600, 1000, 650);
+        mapping.noteForTap(400, 1000, 700);
+        mapping.noteForTap(600, 1000, 750);
+
+        assertEquals(0.4f, mapping.getCenterRatio(0), 0.03f);
+        assertEquals(0.6f, mapping.getCenterRatio(1), 0.03f);
+    }
+
+    @Test
+    public void deadzoneTapNearLearnedFingerIsTrackedWithoutMovingEitherTarget() {
+        MultiKeyMapping mapping = new MultiKeyMapping(new int[]{60, 61},
+                8, 4, 45, MultiKeyMapping.ADAPTIVE_LANES, true);
+        mapping.noteForTap(200, 1000, 100);
+        mapping.noteForTap(400, 1000, 200);
+        mapping.noteForTap(210, 1000, 300);
+        mapping.noteForTap(410, 1000, 400);
+
+        assertNull(mapping.noteForTap(270, 1000, 500));
+
+        assertEquals(0.205f, mapping.getCenterRatio(0), 0.001f);
+        assertEquals(0.405f, mapping.getCenterRatio(1), 0.002f);
+        assertFalse(mapping.hasDeadzoneCluster(0));
+    }
+
+    @Test
+    public void repeatedDeadzoneTapsCreateATrackedClusterThatFiltersEdgeHits() {
+        MultiKeyMapping mapping = new MultiKeyMapping(new int[]{60, 61},
+                8, 4, 45, MultiKeyMapping.ADAPTIVE_LANES, true);
+        mapping.noteForTap(200, 1000, 100);
+        mapping.noteForTap(400, 1000, 200);
+        mapping.noteForTap(210, 1000, 300);
+        mapping.noteForTap(410, 1000, 400);
+
+        assertNull(mapping.noteForTap(340, 1000, 500));
+        assertNull(mapping.noteForTap(330, 1000, 600));
+
+        assertTrue(mapping.hasDeadzoneCluster(0));
+        assertEquals(0.335f, mapping.getDeadzoneClusterCenterRatio(0), 0.002f);
+        assertNull(mapping.noteForTap(360, 1000, 700));
+        assertEquals(0.205f, mapping.getCenterRatio(0), 0.001f);
+        assertEquals(0.405f, mapping.getCenterRatio(1), 0.001f);
+
+        mapping.noteForTap(400, 1000, 800);
+        mapping.noteForTap(600, 1000, 900);
+        assertEquals(mapping.getDeadzoneCenterRatio(0) + 0.035f,
+                mapping.getDeadzoneClusterCenterRatio(0), 0.002f);
+    }
+
+    @Test
+    public void repeatedNearEdgeTapsJoinDeadzoneClusterWithoutTeachingATarget() {
+        MultiKeyMapping mapping = new MultiKeyMapping(new int[]{60, 61},
+                8, 4, 45, MultiKeyMapping.ADAPTIVE_LANES, true);
+        mapping.noteForTap(200, 1000, 100);
+        mapping.noteForTap(400, 1000, 200);
+        mapping.noteForTap(210, 1000, 300);
+        mapping.noteForTap(410, 1000, 400);
+
+        assertNull(mapping.noteForTap(360, 1000, 500));
+        assertNull(mapping.noteForTap(360, 1000, 600));
+
+        assertTrue(mapping.hasDeadzoneCluster(0));
+        assertEquals(0.205f, mapping.getCenterRatio(0), 0.001f);
+        assertEquals(0.405f, mapping.getCenterRatio(1), 0.001f);
+        assertEquals(0.38f, mapping.getAcceptedStartRatio(1), 0.002f);
+        assertEquals(Integer.valueOf(61), mapping.noteForTap(390, 1000, 700));
+    }
+
+
+    @Test
+    public void tapsInLearnedDeadzoneDoNotDistortScreenClusters() {
+        MultiKeyMapping mapping = new MultiKeyMapping(new int[]{60, 61},
+                8, 4, 45, MultiKeyMapping.ADAPTIVE_LANES, true);
+        mapping.noteForTap(200, 1000, 100);
+        mapping.noteForTap(400, 1000, 200);
+        mapping.noteForTap(210, 1000, 300);
+        mapping.noteForTap(410, 1000, 400);
+
+        assertNull(mapping.noteForTap(305, 1000, 500));
+        assertEquals(0.205f, mapping.getCenterRatio(0), 0.001f);
+        assertEquals(0.405f, mapping.getCenterRatio(1), 0.001f);
+    }
+
+
+    @Test
     public void adaptiveDeadzoneFollowsTheMovingLaneCenters() {
         MultiKeyMapping mapping = new MultiKeyMapping(new int[]{60, 61},
                 20, 1, 45, MultiKeyMapping.ADAPTIVE_LANES);

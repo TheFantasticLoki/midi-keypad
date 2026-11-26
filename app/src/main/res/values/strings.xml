@@ -49,4 +49,6 @@
     <string name="custom_notes_label">MIDI note for each key (0–127)</string>
     <string name="custom_key_note_label">Key %1$d note</string>
     <string name="custom_mode_hint">Choose the number of keys and whether lane positions stay static or adapt to your taps.</string>
+    <string name="screen_context_label">Learn hand position from tap history</string>
+    <string name="screen_context_hint">Uses repeated tap locations over time to shift all adaptive lanes together.</string>
 </resources>

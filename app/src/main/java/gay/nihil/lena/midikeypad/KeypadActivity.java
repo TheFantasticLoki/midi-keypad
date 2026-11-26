@@ -190,7 +190,9 @@ public class KeypadActivity extends AppCompatActivity {
                         midiChannel, getIntent().getIntExtra("customDeadzonePercent", 8),
                         getIntent().getIntExtra("historySize", 12),
                         getIntent().getIntExtra("maxShiftPercent", 8),
-                        getIntent().getIntExtra("customLayout", MultiKeyMapping.ADAPTIVE_LANES));
+                        getIntent().getIntExtra("customLayout", MultiKeyMapping.ADAPTIVE_LANES),
+                        getIntent().getBooleanExtra("screenContextEnabled", true),
+                        getIntent().getIntExtra("targetWidthPercent", 40));
                 break;
             }
             case KeypadModes.LEGACY_OSU_STATIC:

@@ -78,23 +78,77 @@ final class TwoKeyOverlayRenderer {
                              String layoutName, String deadzoneLabel) {
         int keyCount = mapping.getKeyCount();
         float[] centers = new float[keyCount];
+        float laneShift = mapping.getLayoutShiftRatio();
+        if (mapping.isScreenContextEnabled()) {
+            canvas.drawRect(0, 0, width, height, fill(0x66303030));
+        }
 
         for (int i = 0; i < keyCount; i++) {
             centers[i] = mapping.getCenterRatio(i);
             float left = 0f;
             float right = width;
-            if (i > 0) {
+            if (mapping.isScreenContextEnabled()) {
+                left = clamp((i / (float) keyCount + laneShift) * width, 0f, width);
+                right = clamp(((i + 1f) / keyCount + laneShift) * width, 0f, width);
+            } else if (i > 0) {
                 left = (centers[i] + centers[i - 1]) * width / 2f
                         + mapping.getDeadzoneHalfWidthRatio(i - 1) * width;
             }
-            if (i < keyCount - 1) {
+            if (!mapping.isScreenContextEnabled() && i < keyCount - 1) {
                 right = (centers[i] + centers[i + 1]) * width / 2f
                         - mapping.getDeadzoneHalfWidthRatio(i) * width;
             }
 
             float hue = 360f * i / keyCount;
             int laneColor = Color.HSVToColor(136, new float[]{hue, 0.65f, 0.82f});
-            canvas.drawRect(left, 0, right, height, fill(laneColor));
+            if (mapping.isScreenContextEnabled()) {
+                canvas.drawRect(left, 0, right, height, fill(0x22303030));
+                Paint buttonOutline = new Paint(Paint.ANTI_ALIAS_FLAG);
+                buttonOutline.setColor(Color.WHITE);
+                buttonOutline.setAlpha(70);
+                buttonOutline.setStyle(Paint.Style.STROKE);
+                buttonOutline.setStrokeWidth(Math.max(1f, density));
+                canvas.drawRect(left, 0, right, height, buttonOutline);
+            } else {
+                canvas.drawRect(left, 0, right, height, fill(laneColor));
+            }
+
+            if (mapping.isAdaptive()) {
+                float acceptedLeft = mapping.isScreenContextEnabled()
+                        ? mapping.getAcceptedStartRatio(i) * width
+                        : Math.max(left, centers[i] * width
+                        - (mapping.getTargetWidthPercent() / 2f
+                        + mapping.getMaxShiftPercent()) * width / 100f);
+                float acceptedRight = mapping.isScreenContextEnabled()
+                        ? mapping.getAcceptedEndRatio(i) * width
+                        : Math.min(right, centers[i] * width
+                        + (mapping.getTargetWidthPercent() / 2f
+                        + mapping.getMaxShiftPercent()) * width / 100f);
+                canvas.drawRect(acceptedLeft, 0, acceptedRight, height,
+                        fill(mapping.isScreenContextEnabled() ? laneColor : 0x33FFFFFF));
+                Paint acceptedOutline = new Paint(Paint.ANTI_ALIAS_FLAG);
+                acceptedOutline.setColor(Color.WHITE);
+                acceptedOutline.setAlpha(150);
+                acceptedOutline.setStyle(Paint.Style.STROKE);
+                acceptedOutline.setStrokeWidth(Math.max(1f, 1f * density));
+                acceptedOutline.setPathEffect(
+                        new DashPathEffect(new float[]{5f * density, 5f * density}, 0));
+                canvas.drawRect(acceptedLeft, 0, acceptedRight, height, acceptedOutline);
+
+                float halfTargetWidth = mapping.getTargetWidthPercent() * width / 200f;
+                float targetLeft = Math.max(acceptedLeft, centers[i] * width - halfTargetWidth);
+                float targetRight = Math.min(acceptedRight, centers[i] * width + halfTargetWidth);
+                Paint targetFill = fill(0x55FFFFFF);
+                canvas.drawRect(targetLeft, 0, targetRight, height, targetFill);
+                Paint targetOutline = new Paint(Paint.ANTI_ALIAS_FLAG);
+                targetOutline.setColor(Color.WHITE);
+                targetOutline.setAlpha(220);
+                targetOutline.setStyle(Paint.Style.STROKE);
+                targetOutline.setStrokeWidth(Math.max(1f, 2f * density));
+                targetOutline.setPathEffect(
+                        new DashPathEffect(new float[]{8f * density, 5f * density}, 0));
+                canvas.drawRect(targetLeft, 0, targetRight, height, targetOutline);
+            }
 
             Paint notePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
             notePaint.setColor(Color.WHITE);
@@ -122,7 +176,7 @@ final class TwoKeyOverlayRenderer {
         gapEdge.setStrokeWidth(Math.max(1f, 1.5f * density));
         for (int i = 0; i < keyCount - 1; i++) {
             float midpoint = (centers[i] + centers[i + 1]) * width / 2f;
-            float halfGap = mapping.getDeadzoneHalfWidthRatio(i) * width;
+            float halfGap = mapping.getEffectiveDeadzoneHalfWidthRatio(i) * width;
             if (halfGap > 0) {
                 canvas.drawRect(midpoint - halfGap, 0, midpoint + halfGap, height, gapPaint);
                 canvas.drawLine(midpoint - halfGap, 0, midpoint - halfGap, height, gapEdge);
@@ -130,10 +184,18 @@ final class TwoKeyOverlayRenderer {
             } else {
                 drawLine(canvas, midpoint, height, density);
             }
+            if (mapping.hasDeadzoneCluster(i)) {
+                float clusterCenter = mapping.getDeadzoneClusterCenterRatio(i) * width;
+                float clusterRadius = mapping.getDeadzoneClusterRadiusRatio(i) * width;
+                drawDeadzone(canvas, clusterCenter - clusterRadius,
+                        clusterCenter + clusterRadius, height, density);
+            }
         }
 
+        String targetLabel = mapping.isAdaptive()
+                ? " | target " + mapping.getTargetWidthPercent() + "%" : "";
         drawCaption(canvas, width, density, keyCount + " keys | " + layoutName
-                + " | MIDI ch " + midiChannel + " | " + deadzoneLabel);
+                + " | MIDI ch " + midiChannel + targetLabel + " | " + deadzoneLabel);
     }
 
     private static void drawDeadzone(Canvas canvas, float left, float right,
